@@ -565,8 +565,6 @@ namespace BASIC
             {
                 if (!func.HasReturnValue)
                     throw new BasicException("Illegal function call");
-                if (func.In.Length != args.Count)
-                    throw new BasicException("Illegal function call");
                 var inte = new Interpreter2(Interpreter);
                 inte.result = this.result;
                 return inte.CallUserFunction(func, args);
@@ -1038,8 +1036,10 @@ namespace BASIC
             }
             bool IsFunction;
             Value ReturnValue;
-            private Value CallUserFunction(Function func, List<Value> value)
+            public Value CallUserFunction(Function func, List<Value> value)
             {
+                if (func.In.Length != value.Count)
+                    throw new BasicException("Illegal function call");
                 var local = new Dictionary<string, Value>();
                 int j = 0;
                 foreach (var item in func.In)
@@ -1383,12 +1383,18 @@ namespace BASIC
 
         public string Process(string msg, string arg)
         {
-            var a = Interpreter.Run(Label);
-            a.SetVariable("A1$", msg);
-            a.SetVariable("A2$", arg);
-            return a.Run(false);
+            if (Label.StartsWith("@"))
+            {
+                var a = Interpreter.Run(Label);
+                a.SetVariable("A1$", msg);
+                a.SetVariable("A2$", arg);
+                return a.Run(false);
+            }
+            else
+            {
+                var a = new Interpreter.Interpreter2(Interpreter);
+                return a.CallUserFunction(a.FunctionTable[Label], new List<Value> { new Value(msg), new Value(arg) }).ToString();
+            }
         }
     }
-
-
 }
