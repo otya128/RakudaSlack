@@ -887,9 +887,10 @@ namespace BASIC
                 var v = Current; Next();
                 if (v.Type != TokenType.Iden)
                     throw new BasicException("Syntax error");
-                var eq = Current; Next();
+                var eq = Current;
                 if (eq.Type == TokenType.LBracket)
                 {
+                    Next();
                     var index = Expr();
                     if (Current.Type != TokenType.RBracket)
                         throw new BasicException("Syntax error");
@@ -908,7 +909,12 @@ namespace BASIC
                 else
                 {
                     if (eq.Type != TokenType.Equal)
-                        throw new BasicException("Syntax error");
+                    {
+                        FuncStatement(v.String);
+                        return;
+                    }
+                    Next();
+
                     var expr = Expr();
                     if (!Assignable(expr.Type, v.String))
                     {
@@ -916,6 +922,37 @@ namespace BASIC
                     }
                     variable[v.String] = expr;
                 }
+            }
+
+            private void FuncStatement(string funcname)
+            {
+                List<Value> args = new List<Value>();
+                while (IsExpr(Current.Type))
+                {
+                    args.Add(Expr());
+                    if (Current.Type == TokenType.Comma)
+                    {
+                        Next();
+                        continue;
+                    }
+                    Next();
+                    break;
+                }
+                Call(funcname, args);
+            }
+
+            private bool IsExpr(TokenType type)
+            {
+                switch (type)
+                {
+                    case TokenType.Iden:
+                    case TokenType.Number:
+                    case TokenType.Minus:
+                    case TokenType.MakeProcInstance:
+                    case TokenType.String:
+                        return true;
+                }
+                return false;
             }
 
             private bool Assignable(ValueType type, string name)
@@ -1009,7 +1046,7 @@ namespace BASIC
                 {
                     local.Add(item, value[j++]);//TODO:
                 }
-                labelTable = new Dictionary<string, int>();
+                labelTable = func.LabelTable;
                 variable = new DoubleDictionary<string, Value>(variable, local);
                 i = func.Start;
                 IsFunction = true;
@@ -1072,7 +1109,7 @@ namespace BASIC
                     }
                     Next();
                 }
-                var func = new Function { End = i, Start = si, HasReturnValue = hasValue, In = inargs.ToArray() };
+                var func = new Function { End = i, Start = si, HasReturnValue = hasValue, In = inargs.ToArray(), LabelTable = lt };
                 FunctionTable.Add(name, func);
             }
 
