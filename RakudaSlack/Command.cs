@@ -1,6 +1,5 @@
 ﻿using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-using NMeCab;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
