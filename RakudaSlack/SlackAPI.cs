@@ -80,7 +80,7 @@ namespace RakudaSlack
                 col["ts"] = PostedMessage.ts;
                 Construct(col);
                 var wc = new WebClient();
-                PostedMessage = JsonConvert.DeserializeObject<PostedMessage>(wc.DownloadString("https://slack.com/api/chat.update?" + col.ToQString()));
+                JsonConvert.DeserializeObject<PostedMessage>(wc.DownloadString("https://slack.com/api/chat.update?" + col.ToQString()));
             }
         }
         public void Construct(NameValueCollection queryString)

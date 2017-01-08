@@ -563,8 +563,6 @@ namespace BASIC
             
             private Value Call(Function func, List<Value> args)
             {
-                if (!func.HasReturnValue)
-                    throw new BasicException("Illegal function call");
                 var inte = new Interpreter2(Interpreter);
                 inte.result = this.result;
                 return inte.CallUserFunction(func, args);
