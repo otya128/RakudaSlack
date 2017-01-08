@@ -1,0 +1,166 @@
+ex:
+(void set append3 command(x,y)
+ echo(append(y,x))
+) |
+(void set fill command(ary,val,pos,len)
+ (
+  (void arrayaccess(ary,pos,val)) |
+  (if equal(plus(pos,1),len) then
+    (void fill(ary,val,plus(pos,1),len))
+   else
+    (void 1)
+  )
+ )
+) |
+(void set brainfucker command(prog)
+(
+ (
+  void set iinc ">"
+ ) |
+ (
+  void set idec "<"
+ ) |
+ (
+  void set inc "+"
+ ) |
+ (
+  void set dec "-"
+ ) |
+ (
+  void set put "."
+ ) |
+ (
+  void set get ","
+ ) |
+ (
+  void set loopstart "["
+ ) |
+ (
+  void set loopend "]"
+ ) |
+ (void set run command()
+  (
+   (
+    void set output "output/"
+   ) |
+   (
+    void set i 0
+   ) |
+   (
+    void set pointer 0
+   ) |
+   (
+    void set memory array2(30000)
+   ) |
+   (
+    void fill(memory,0,0,30000)
+   ) |
+   (
+    void set findloopend command(prog,i)
+    (
+     (void set instr substr(prog,i,1)) |
+     (if equal(instr,loopend) then
+       echo(i)
+      else
+       (
+        (if equal(instr,loopstart) then
+         (
+          (void set i,.(prog,plus(i,1))) |
+          findloopend(prog,plus(i,1))
+         )
+         else
+         findloopend(prog,plus(i,1))
+        )
+       )
+     )
+    )
+   ) |
+   (
+    void set findloopstart command(prog,i)
+    (
+     (void set instr substr(prog,i,1)) |
+     (if equal(instr,loopstart) then
+       echo(i)
+      else
+       (
+        (if equal(instr,loopend) then
+         (
+          (void set i,.(prog,minus(i,1))) |
+          findloopstart(prog,minus(i,1))
+         )
+         else
+         findloopstart(prog,minus(i,1))
+        )
+       )
+     )
+    )
+   ) |
+   (
+    void
+     (
+      set runinstr command()
+      (
+       (void
+        (
+         (void set instr substr(prog,i,1)) |
+         (void if equal(instr,iinc) then
+          (void set pointer plus(pointer,1))
+         else
+          (void if equal(instr,idec) then
+           (void set pointer minus(pointer,1))
+          else
+           (void if equal(instr,inc) then
+            (void arrayaccess(memory,pointer,mod(plus(arrayaccess(memory, pointer),1),256)))
+           else
+            (void if equal(instr,dec) then
+             (void arrayaccess(memory,pointer,mod(minus(arrayaccess(memory, pointer),1),256)))
+             else
+              (void if equal(instr,put) then
+               (void set output append(echo(output), (arrayaccess(memory, pointer) | chr)))
+              else
+               (void if equal(instr,loopstart) then
+                (
+                 if equal(arrayaccess(memory, pointer),0) then
+                  (void set i findloopend(prog,plus(i,1)))
+                 else
+                  (void 1)
+                
+                )
+               else
+                (
+                 (void if equal(instr,loopend) then
+                   if equal(arrayaccess(memory, pointer),0) then
+                    (void 1)
+                   else
+                    (void set i findloopstart(prog,minus(i,1)))
+                  else
+                   (void 1)
+                  )
+                 )
+               )
+              )
+            )
+           )
+          )
+         )
+        )
+       ) |
+       (void set i plus(i,1)) |
+       (void if equal(len(prog),i) then
+         (void 1)
+        else
+         (void runinstr())
+       )
+      )
+     )
+   ) |
+   (
+    void runinstr()
+   ) |
+   echo(output)
+  )
+ ) |
+ .
+)) |
+(void set bf brainfucker("+++++++++[>++++++++>+++++++++++>+++++<<<-]>.>++.+++++++..+++.>-.------------.<++++++++.--------.+++.------.--------.>+.")) |
+(echo(bf.run()))
