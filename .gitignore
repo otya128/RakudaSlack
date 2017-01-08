@@ -243,3 +243,8 @@ ModelManifest.xml
 
 # FAKE - F# Make
 .fake/
+
+# yabai yatsu
+GoogleTranslate.cs
+Mecaber.cs
+
