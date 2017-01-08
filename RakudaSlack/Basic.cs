@@ -1432,17 +1432,24 @@ namespace BASIC
 
         public string Process(string msg, string arg)
         {
-            if (Label.StartsWith("@"))
+            try
             {
-                var a = Interpreter.Run(Label);
-                a.SetVariable("A1$", msg);
-                a.SetVariable("A2$", arg);
-                return a.Run(false);
+                if (Label.StartsWith("@"))
+                {
+                    var a = Interpreter.Run(Label);
+                    a.SetVariable("A1$", msg);
+                    a.SetVariable("A2$", arg);
+                    return a.Run(false);
+                }
+                else
+                {
+                    var a = new Interpreter.Interpreter2(Interpreter);
+                    return a.CallUserFunction(a.FunctionTable[Label], new List<Value> { new Value(msg), new Value(arg) }).ToString();
+                }
             }
-            else
+            catch (BasicException e)
             {
-                var a = new Interpreter.Interpreter2(Interpreter);
-                return a.CallUserFunction(a.FunctionTable[Label], new List<Value> { new Value(msg), new Value(arg) }).ToString();
+                return e.Message;
             }
         }
     }
