@@ -82,6 +82,9 @@ namespace BASIC
         MakeProcInstance,
         Def,
         End,
+        And,
+        Or,
+        Xor,
     }
     struct Token
     {
@@ -466,6 +469,12 @@ namespace BASIC
                                 return new Token(TokenType.Def, v);
                             case "END":
                                 return new Token(TokenType.End, v);
+                            case "AND":
+                                return new Token(TokenType.And, v);
+                            case "OR":
+                                return new Token(TokenType.Or, v);
+                            case "XOR":
+                                return new Token(TokenType.Xor, v);
                             default:
                                 return new Token(TokenType.Iden, v);
                         }
@@ -704,9 +713,49 @@ namespace BASIC
 
                 }
             }
+            public Value Expr7()
+            {
+                var expr = Expr6();
+                while (true)
+                {
+                    var token = Current;
+                    if (token.Type != TokenType.And)
+                    {
+                        return expr;
+                    }
+                    Next();
+                    var expr2 = Expr6();
+                    if (token.Type == TokenType.And)
+                    {
+                        expr = new Value((int)expr.Number & (int)expr2.Number);
+                    }
+                }
+            }
+            public Value Expr9()
+            {
+                var expr = Expr7();
+                while (true)
+                {
+                    var token = Current;
+                    if (token.Type != TokenType.Or && token.Type != TokenType.Xor)
+                    {
+                        return expr;
+                    }
+                    Next();
+                    var expr2 = Expr7();
+                    if (token.Type == TokenType.Or)
+                    {
+                        expr = new Value((int)expr.Number | (int)expr2.Number);
+                    }
+                    if (token.Type == TokenType.Xor)
+                    {
+                        expr = new Value((int)expr.Number ^ (int)expr2.Number);
+                    }
+                }
+            }
             public Value Expr()
             {
-                return Expr6();
+                return Expr9();
             }
             public void Print()
             {
