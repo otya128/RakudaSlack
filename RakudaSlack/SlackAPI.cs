@@ -200,6 +200,16 @@ namespace RakudaSlack
             ws.Connect();
         }
 
+        public static bool HasCurrentPostCount
+        {
+            get { return CallContext.LogicalGetData("Slack.CurrentPostCount") != null; }
+        }
+        public static int CurrentPostCount
+        {
+            get { return (int)CallContext.LogicalGetData("Slack.CurrentPostCount"); }
+            set { CallContext.LogicalSetData("Slack.CurrentPostCount", value); }
+        }
+
         public static Slack Current
         {
             get { return CallContext.LogicalGetData("Slack") as Slack; }
@@ -217,6 +227,7 @@ namespace RakudaSlack
         private PostMessage ProcessCommand(RTM.Message x)
         {
             AliasCommand.RecCount = 0;
+            CurrentPostCount = 0;
             CallContext.LogicalSetData("Slack", this);
             x.text = HttpUtility.HtmlDecode(x.text);
             var i = x.text.IndexOf(':');

@@ -2610,4 +2610,37 @@ namespace RakudaSlack
             return msg;
         }
     }
+    class Post : ICommand
+    {
+        public string Name
+        {
+            get
+            {
+                return "post";
+            }
+        }
+
+        public string Process(string msg, string arg)
+        {
+            if (!Slack.HasCurrentPostCount || Slack.CurrentPostCount >= 10)
+            {
+                return "failure";
+            }
+            Slack.CurrentPostCount++;
+            var slack = Slack.Current;
+            var pmsg = new PostMessage { Slack = Slack.Current, Text = msg, Channel = Slack.CurrentMessage.Channel };
+            var command = CommandParser.ParseCommand(arg, true);
+            pmsg.OnPosted += () =>
+            {
+                Task.Run(() =>
+                {
+                    Slack.CurrentMessage = pmsg;
+                    Slack.Current = slack;
+                    command.Command.Process("", command.Argument);
+                });
+            };
+            pmsg.Post();
+            return "success";
+        }
+    }
 }
