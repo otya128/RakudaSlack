@@ -6,6 +6,7 @@ using System.Text;
 using System.Threading.Tasks;
 using StringArray = System.Collections.Generic.List<string>;
 using NumberArray = System.Collections.Generic.List<double>;
+using System.Collections;
 
 namespace BASIC
 {
@@ -79,6 +80,8 @@ namespace BASIC
         LBracket,
         RBracket,
         MakeProcInstance,
+        Def,
+        End,
     }
     struct Token
     {
@@ -289,6 +292,7 @@ namespace BASIC
         BuiltinFunction bf = new BuiltinFunction();
         Dictionary<string, Value> variable = new Dictionary<string, Value>();
         Dictionary<string, int> labelTable = new Dictionary<string, int>();
+        Dictionary<string, Function> FunctionTable = new Dictionary<string, Function>();
 
         public Interpreter(string msg)
         {
@@ -298,7 +302,7 @@ namespace BASIC
         {
             internal string Program;
             internal BuiltinFunction bf;
-            internal Dictionary<string, Value> variable;
+            internal IDictionary<string, Value> variable;
             bool IsIdentFirstChar(char c)
             {
                 return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_';
@@ -458,6 +462,10 @@ namespace BASIC
                                 return new Token(TokenType.Let, v);
                             case "MAKEPROCINSTANCE":
                                 return new Token(TokenType.MakeProcInstance, v);
+                            case "DEF":
+                                return new Token(TokenType.Def, v);
+                            case "END":
+                                return new Token(TokenType.End, v);
                             default:
                                 return new Token(TokenType.Iden, v);
                         }
@@ -552,9 +560,25 @@ namespace BASIC
                 }
 
             }
+            
+            private Value Call(Function func, List<Value> args)
+            {
+                if (!func.HasReturnValue)
+                    throw new BasicException("Illegal function call");
+                if (func.In.Length != args.Count)
+                    throw new BasicException("Illegal function call");
+                var inte = new Interpreter2(Interpreter);
+                inte.result = this.result;
+                return inte.CallUserFunction(func, args);
+            }
+
 
             private Value Call(string funcname, List<Value> args)
             {
+                if (FunctionTable.ContainsKey(funcname))
+                {
+                    return Call(FunctionTable[funcname], args);
+                }
                 if (funcname.EndsWith("$"))
                 {
                     funcname = funcname.TrimEnd('$');
@@ -782,6 +806,13 @@ namespace BASIC
             }
             void Return()
             {
+                if (IsFunction)
+                {
+                    Next();
+                    ReturnValue = Expr();
+                    i = Program.Length;
+                    return;
+                }
                 i = stack.Pop();
                 p = false;
             }
@@ -837,6 +868,14 @@ namespace BASIC
                     case TokenType.Let:
                         Next();
                         Let();
+                        break;
+                    case TokenType.Def:
+                        Next();
+                        i = FunctionTable[Current.String].End;
+                        p = false;
+                        break;
+                    case TokenType.End:
+                        i = Program.Length;
                         break;
                     default:
                         throw new BasicException($"unexpected {(c.String != null ? c.String : c.Type.ToString())}");
@@ -906,6 +945,18 @@ namespace BASIC
 
             internal int i;
             internal Dictionary<string, int> labelTable;
+            internal Dictionary<string, Function> FunctionTable;
+
+            public Interpreter2(Interpreter interpreter)
+            {
+                Interpreter = interpreter;
+                Program = interpreter.Program;
+                bf = interpreter.bf;
+                variable = interpreter.variable;
+                labelTable = interpreter.labelTable;
+                FunctionTable = interpreter.FunctionTable;
+            }
+
             public string Run(bool newinstance = true)
             {
                 lock (this)
@@ -927,6 +978,10 @@ namespace BASIC
                                     labelTable.Add(Current.String, i);
                                 }
                             }
+                            if (Current.Type == TokenType.Def)
+                            {
+                                Defun();
+                            }
                             isfirst = false;
                             if (i >= Program.Length)
                                 break;
@@ -943,6 +998,82 @@ namespace BASIC
                     }
                     return result.ToString();
                 }
+            }
+            bool IsFunction;
+            Value ReturnValue;
+            private Value CallUserFunction(Function func, List<Value> value)
+            {
+                var local = new Dictionary<string, Value>();
+                int j = 0;
+                foreach (var item in func.In)
+                {
+                    local.Add(item, value[j++]);//TODO:
+                }
+                labelTable = new Dictionary<string, int>();
+                variable = new DoubleDictionary<string, Value>(variable, local);
+                i = func.Start;
+                IsFunction = true;
+
+                while (true)
+                {
+                    Statement();
+                    if (i >= Program.Length)
+                        break;
+                }
+                return ReturnValue;
+            }
+            //DEF IDEN'('(IDEN',')*IDEN?')'
+            private void Defun()
+            {
+                Next();
+                if (Current.Type != TokenType.Iden)
+                    throw new BasicException("Syntax error(DEF)");
+                var name = Current.String;
+                Next();
+                bool hasValue;
+                if (Current.Type == TokenType.LParen)
+                {
+                    Next();
+                    hasValue = true;
+                }
+                else
+                    hasValue = false;
+                List<string> inargs = new List<string>();
+                while (Current.Type == TokenType.Iden)
+                {
+                    inargs.Add(Current.String);
+                    Next();
+                    if (Current.Type != TokenType.Comma)
+                        break;
+                    Next();
+                }
+                if (hasValue)
+                {
+                    if (Current.Type != TokenType.RParen)
+                    {
+                        throw new BasicException("Syntax error(DEF)");
+                    }
+                    Next();
+                }
+                var si = i;
+                var lt = new Dictionary<string, int>();
+                bool isfirst = false;
+                while (Current.Type != TokenType.End && i < Program.Length)
+                {
+                    var c = Current;
+                    if (c.Type == TokenType.NewLine || isfirst)
+                    {
+                        if (!isfirst)
+                            Next();
+                        if (Current.Type == TokenType.Label)
+                        {
+                            lt.Add(Current.String, i);
+                        }
+                    }
+                    Next();
+                }
+                var func = new Function { End = i, Start = si, HasReturnValue = hasValue, In = inargs.ToArray() };
+                FunctionTable.Add(name, func);
             }
 
             public string Run(string label)
@@ -963,27 +1094,160 @@ namespace BASIC
         }
         public string Run()
         {
-            var inte = new Interpreter2();
-            inte.Interpreter = this;
-            inte.Program = Program;
-            inte.bf = bf;
-            inte.variable = variable;
-            inte.labelTable = labelTable;
+            var inte = new Interpreter2(this);
             return inte.Run();
         }
         public Interpreter2 Run(string label)
         {
-            var inte = new Interpreter2();
-            inte.Interpreter = this;
-            inte.Program = Program;
-            inte.bf = bf;
-            inte.variable = variable;
-            inte.labelTable = labelTable;
+            var inte = new Interpreter2(this);
             inte.i = labelTable[label];
             return inte;
         }
 
     }
+
+    internal class DoubleDictionary<TKey, TValue> : IDictionary<TKey, TValue>
+    {
+        IDictionary<TKey, TValue> BaseDictionary;
+        IDictionary<TKey, TValue> BaseDictionary2;
+        public DoubleDictionary(IDictionary<TKey, TValue> dictionary, IDictionary<TKey, TValue> dictionary2)
+        {
+            BaseDictionary = dictionary;
+            BaseDictionary2 = dictionary2;
+        }
+        public TValue this[TKey key]
+        {
+            get
+            {
+                if (BaseDictionary2.ContainsKey(key))
+                    return BaseDictionary2[key];
+                return BaseDictionary[key];
+            }
+            set
+            {
+                if (BaseDictionary2.ContainsKey(key))
+                {
+                    BaseDictionary2[key] = value;
+                }
+                if (BaseDictionary.ContainsKey(key))
+                {
+                    BaseDictionary[key] = value;
+                }
+                BaseDictionary2[key] = value;
+            }
+        }
+
+        public int Count
+        {
+            get
+            {
+                return this.BaseDictionary.Count + BaseDictionary2.Count;
+            }
+        }
+
+        public bool IsReadOnly
+        {
+            get
+            {
+                return this.BaseDictionary.IsReadOnly && this.BaseDictionary2.IsReadOnly;
+            }
+        }
+
+        public ICollection<TKey> Keys
+        {
+            get
+            {
+                throw new NotImplementedException();
+            }
+        }
+
+        public ICollection<TValue> Values
+        {
+            get
+            {
+                throw new NotImplementedException();
+            }
+        }
+
+        public void Add(KeyValuePair<TKey, TValue> item)
+        {
+            this.BaseDictionary2.Add(item);
+        }
+
+        public void Add(TKey key, TValue value)
+        {
+            this.BaseDictionary2.Add(key, value);
+        }
+
+        public void Clear()
+        {
+            this.BaseDictionary.Clear();
+            this.BaseDictionary2.Clear();
+        }
+
+        public bool Contains(KeyValuePair<TKey, TValue> item)
+        {
+            return this.BaseDictionary2.Contains(item) || this.BaseDictionary.Contains(item);
+        }
+
+        public bool ContainsKey(TKey key)
+        {
+            return BaseDictionary.ContainsKey(key) || BaseDictionary2.ContainsKey(key);
+        }
+
+        public void CopyTo(KeyValuePair<TKey, TValue>[] array, int arrayIndex)
+        {
+            throw new NotSupportedException();
+        }
+
+        public IEnumerator<KeyValuePair<TKey, TValue>> GetEnumerator()
+        {
+            foreach (var item in BaseDictionary)
+            {
+                yield return item;
+            }
+            foreach (var item in BaseDictionary2)
+            {
+                yield return item;
+            }
+        }
+
+        public bool Remove(TKey key)
+        {
+            return BaseDictionary2.Remove(key) || BaseDictionary.Remove(key);
+        }
+
+        public bool Remove(KeyValuePair<TKey, TValue> item)
+        {
+            return BaseDictionary2.Remove(item) || BaseDictionary.Remove(item);
+        }
+
+        public bool TryGetValue(TKey key, out TValue value)
+        {
+            return BaseDictionary2.TryGetValue(key, out value) || BaseDictionary.TryGetValue(key, out value);
+        }
+
+        IEnumerator IEnumerable.GetEnumerator()
+        {
+            foreach (var item in BaseDictionary)
+            {
+                yield return item;
+            }
+            foreach (var item in BaseDictionary2)
+            {
+                yield return item;
+            }
+        }
+    }
+
+    class Function
+    {
+        public string[] In;
+        public bool HasReturnValue;
+        public int Start, End;
+        public Dictionary<string, int> LabelTable;
+    }
+
     class BuiltinFunction
     {
         public double INT(double x)
