@@ -1911,6 +1911,7 @@ namespace RakudaSlack
             return m_func(msg);
         }
     }
+#if RAKUDALANG
     class Rakuda : ICommand
     {
         public string Name
@@ -1965,6 +1966,7 @@ namespace RakudaSlack
             return text;
         }
     }
+#endif
     class Repeat : ICommand
     {
         public string Name

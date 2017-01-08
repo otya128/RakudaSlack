@@ -64,7 +64,9 @@ namespace RakudaSlack
             CommandRegister.Regist(new Filter("おちゃめ", ochame));
             CommandRegister.Regist(new Filter("んちゃめ", nchame));
             CommandRegister.Regist(new Filter("んもうだめ", nmoudame));
+#if RAKUDALANG
             CommandRegister.Regist(new Rakuda());
+#endif
             CommandRegister.Regist(new Pipe());
             CommandRegister.Regist(new Repeat());
             CommandRegister.Regist(new Plus());
