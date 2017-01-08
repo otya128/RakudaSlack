@@ -1107,6 +1107,8 @@ namespace BASIC
                             lt.Add(Current.String, i);
                         }
                     }
+                    if (Current.Type == TokenType.End)
+                        break;
                     Next();
                 }
                 var func = new Function { End = i, Start = si, HasReturnValue = hasValue, In = inargs.ToArray(), LabelTable = lt };
