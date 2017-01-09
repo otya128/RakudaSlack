@@ -1586,7 +1586,7 @@ namespace BASIC
         public Dictionary<string, int> LabelTable;
         public string Name;
 
-        internal virtual IDictionary<string, Value> Init(List<Value> args, Interpreter.Interpreter2 inter)
+        internal virtual IDictionary<string, Value> Init(List<Value> args)
         {
             var local = new Dictionary<string, Value>();
             int j = 0;
@@ -1610,9 +1610,8 @@ namespace BASIC
             End = @base.End;
         }
         Instance Instance;
-        internal override IDictionary<string, Value> Init(List<Value> args, Interpreter.Interpreter2 inter)
+        internal override IDictionary<string, Value> Init(List<Value> args)
         {
-            new Dic
             return new DoubleDictionary<string, Value>(Instance.Variable, base.Init(args));
         }
     }
