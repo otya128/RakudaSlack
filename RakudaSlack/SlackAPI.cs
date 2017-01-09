@@ -221,6 +221,11 @@ namespace RakudaSlack
             get { return CallContext.LogicalGetData("Slack.CurrentMessage") as PostMessage; }
             set { CallContext.LogicalSetData("Slack.CurrentMessage", value); }
         }
+        public static PostMessage[] CurrentMessages
+        {
+            get { return CallContext.LogicalGetData("Slack.CurrentMessages") as PostMessage[]; }
+            set { CallContext.LogicalSetData("Slack.CurrentMessages", value); }
+        }
 
         public string User { get; private set; }
 
@@ -228,6 +233,7 @@ namespace RakudaSlack
         {
             AliasCommand.RecCount = 0;
             CurrentPostCount = 0;
+            CurrentMessages = new PostMessage[10];
             CallContext.LogicalSetData("Slack", this);
             x.text = HttpUtility.HtmlDecode(x.text);
             var i = x.text.IndexOf(':');

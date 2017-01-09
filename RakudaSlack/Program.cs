@@ -114,6 +114,9 @@ namespace RakudaSlack
             CommandRegister.Regist(new AddReaction());
             CommandRegister.Regist(new SetIconEmoji());
             CommandRegister.Regist(new Post());
+            CommandRegister.Regist(new SetPost());
+            CommandRegister.Regist(new GetPost());
+            CommandRegister.Regist(new Edit());
 
             AliasDefine.LoadAlias();
             if (args.Length == 0)

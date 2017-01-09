@@ -2473,7 +2473,7 @@ namespace RakudaSlack
         }
     }
 
-    
+
     class OnReaction : ICommand
     {
         public string Name
@@ -2624,8 +2624,9 @@ namespace RakudaSlack
         {
             if (!Slack.HasCurrentPostCount || Slack.CurrentPostCount >= 10)
             {
-                return "failure";
+                return "-1";
             }
+            var pc = Slack.CurrentPostCount;
             Slack.CurrentPostCount++;
             var slack = Slack.Current;
             var pmsg = new PostMessage { Slack = Slack.Current, Text = msg, Channel = Slack.CurrentMessage.Channel };
@@ -2635,11 +2636,60 @@ namespace RakudaSlack
                 Task.Run(() =>
                 {
                     Slack.CurrentMessage = pmsg;
+                    Slack.CurrentMessages[pc] = pmsg;
                     Slack.Current = slack;
                     command.Command.Process("", command.Argument);
                 });
             };
             pmsg.Post();
+            return pc.ToString();
+        }
+    }
+    class SetPost : ICommand
+    {
+        public string Name
+        {
+            get
+            {
+                return "setpost";
+            }
+        }
+
+        public string Process(string msg, string arg)
+        {
+            var id = int.Parse(msg);
+            Slack.CurrentMessage = Slack.CurrentMessages[id];
+            return "success";
+        }
+    }
+    class GetPost : ICommand
+    {
+        public string Name
+        {
+            get
+            {
+                return "getpost";
+            }
+        }
+
+        public string Process(string msg, string arg)
+        {
+            return System.Array.IndexOf(Slack.CurrentMessages, Slack.CurrentMessage).ToString();
+        }
+    }
+    class Edit : ICommand
+    {
+        public string Name
+        {
+            get
+            {
+                return "edit";
+            }
+        }
+        public string Process(string msg, string arg)
+        {
+            Slack.CurrentMessage.Text = msg;
+            Slack.CurrentMessage.Post();
             return "success";
         }
     }
