@@ -2498,8 +2498,6 @@ namespace RakudaSlack
                     return;
                 Task.Run(() =>
                 {
-                    Slack.CurrentMessage = cmsg;
-                    Slack.Current = slack;
                     JToken ts;
                     if (reaction.item.TryGetValue("ts", out ts) && ts.Type == JTokenType.String && ts.Value<string>() == cmsg.PostedMessage.ts)
                     {
@@ -2535,8 +2533,6 @@ namespace RakudaSlack
                     return;
                 Task.Run(() =>
                 {
-                    Slack.CurrentMessage = cmsg;
-                    Slack.Current = slack;
                     JToken ts;
                     if (reaction.item.TryGetValue("ts", out ts) && ts.Type == JTokenType.String && ts.Value<string>() == cmsg.PostedMessage.ts)
                     {
@@ -2568,8 +2564,6 @@ namespace RakudaSlack
             {
                 Task.Run(() =>
                 {
-                    Slack.CurrentMessage = cmsg;
-                    Slack.Current = slack;
                     command.Command.Process("", command.Argument);
                 });
             };
@@ -2635,9 +2629,6 @@ namespace RakudaSlack
             {
                 Task.Run(() =>
                 {
-                    Slack.CurrentMessage = pmsg;
-                    Slack.CurrentMessages[pc] = pmsg;
-                    Slack.Current = slack;
                     command.Command.Process("", command.Argument);
                 });
             };
@@ -2690,6 +2681,30 @@ namespace RakudaSlack
         {
             Slack.CurrentMessage.Text = msg;
             Slack.CurrentMessage.Post();
+            return "success";
+        }
+    }
+    class SetTimeout : ICommand
+    {
+        public string Name
+        {
+            get
+            {
+                return "settimeout";
+            }
+        }
+
+        async void a(string msg, string arg)
+        {
+            var time = Math.Max(1000, (int)double.Parse(arg));
+            var command = CommandParser.ParseCommand(msg, true);
+            await Task.Delay(time);
+            command.Command.Process("", "");
+        }
+
+        public string Process(string msg, string arg)
+        {
+            a(msg, arg);
             return "success";
         }
     }

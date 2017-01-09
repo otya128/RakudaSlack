@@ -107,7 +107,7 @@ namespace RakudaSlack
             CommandRegister.Regist(new WGet());
             CommandRegister.Regist(new RegexIsMatch());
             CommandRegister.Regist(new BASIC.BASIC());
-            CommandRegister.Regist(new Browser());
+            //CommandRegister.Regist(new Browser());
             CommandRegister.Regist(new OnReaction());
             CommandRegister.Regist(new OnReactionRemoved());
             CommandRegister.Regist(new OnPosted());
@@ -117,6 +117,7 @@ namespace RakudaSlack
             CommandRegister.Regist(new SetPost());
             CommandRegister.Regist(new GetPost());
             CommandRegister.Regist(new Edit());
+            CommandRegister.Regist(new SetTimeout());
 
             AliasDefine.LoadAlias();
             if (args.Length == 0)
