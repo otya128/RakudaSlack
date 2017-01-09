@@ -85,6 +85,10 @@ namespace BASIC
         And,
         Or,
         Xor,
+        Class,
+        Dim,
+        New,
+        Dot,
     }
     struct Token
     {
@@ -117,6 +121,7 @@ namespace BASIC
         String,
         StringArray,
         NumberArray,
+        Instance,
     }
     struct Value
     {
@@ -189,6 +194,10 @@ namespace BASIC
                         return typeof(double);
                     case ValueType.String:
                         return typeof(string);
+                    case ValueType.NumberArray:
+                        return typeof(NumberArray);
+                    case ValueType.StringArray:
+                        return typeof(StringArray);
                     default:
                         throw new BasicException("Type mismatch");
                 }
@@ -213,6 +222,16 @@ namespace BASIC
             }
         }
 
+        public Instance Instance
+        {
+            get
+            {
+                if (Type != ValueType.Instance)
+                    throw new BasicException("Type mismatch");
+                return mobject as Instance;
+            }
+        }
+
         public Value(double number)
         {
             Type = ValueType.Number;
@@ -225,6 +244,11 @@ namespace BASIC
         }
         public Value(object obj) : this()
         {
+            if (obj == null)
+            {
+                Type = ValueType.None;
+                return;
+            }
             if (obj as double? != null)
             {
                 Type = ValueType.Number;
@@ -250,6 +274,11 @@ namespace BASIC
                 return;
             }
             throw new BasicException("Type mismatch");
+        }
+        public Value(Instance obj) : this()
+        {
+            mobject = obj;
+            Type = ValueType.Instance;
         }
         public Value(string number)
         {
@@ -282,6 +311,8 @@ namespace BASIC
                     return Number.ToString();
                 case ValueType.String:
                     return String as string;
+                case ValueType.Instance:
+                    return (mobject as Instance).Class.Name;
                 default:
                     throw new BasicException("Type mismatch");
             }
@@ -296,6 +327,7 @@ namespace BASIC
         Dictionary<string, Value> variable = new Dictionary<string, Value>();
         Dictionary<string, int> labelTable = new Dictionary<string, int>();
         Dictionary<string, Function> FunctionTable = new Dictionary<string, Function>();
+        IDictionary<string, Class> ClassTable = new Dictionary<string, Class>();
 
         public Interpreter(string msg)
         {
@@ -306,6 +338,7 @@ namespace BASIC
             internal string Program;
             internal BuiltinFunction bf;
             internal IDictionary<string, Value> variable;
+            internal IDictionary<string, Class> ClassTable;
             bool IsIdentFirstChar(char c)
             {
                 return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_';
@@ -369,6 +402,7 @@ namespace BASIC
                             return new Token(TokenType.LBracket);
                         case ']':
                             return new Token(TokenType.RBracket);
+                        case '.': return new Token(TokenType.Dot);
                         default:
                             i--;
                             break;
@@ -475,6 +509,11 @@ namespace BASIC
                                 return new Token(TokenType.Or, v);
                             case "XOR":
                                 return new Token(TokenType.Xor, v);
+                            case "CLASS":
+                                return new Token(TokenType.Class, v);
+                            case "DIM":
+                                return new Token(TokenType.Dim, v);
+                            case "NEW": return new Token(TokenType.New, v);
                             default:
                                 return new Token(TokenType.Iden, v);
                         }
@@ -502,6 +541,29 @@ namespace BASIC
                 return new Token(TokenType.NewLine);
             }
             StringBuilder result;
+            List<Value> Arguments()
+            {
+                List<Value> args = new List<Value>();
+                Next();
+                if (Current.Type == TokenType.RParen)
+                    Next();
+                else while (Current.Type != TokenType.RParen)
+                    {
+                        args.Add(Expr());
+                        if (Current.Type == TokenType.Comma)
+                        {
+                            Next();
+                            continue;
+                        }
+                        if (Current.Type != TokenType.RParen)
+                        {
+                            throw new BasicException("Syntax error");
+                        }
+                        Next();
+                        break;
+                    }
+                return args;
+            }
             public Value Term()
             {
                 var current = Current;
@@ -512,26 +574,7 @@ namespace BASIC
                         {
                             if (Current.Type == TokenType.LParen)
                             {
-                                List<Value> args = new List<Value>();
-                                Next();
-                                if (Current.Type == TokenType.RParen)
-                                    Next();
-                                else while (Current.Type != TokenType.RParen)
-                                {
-                                    args.Add(Expr());
-                                    if (Current.Type == TokenType.Comma)
-                                    {
-                                        Next();
-                                        continue;
-                                    }
-                                    if (Current.Type != TokenType.RParen)
-                                    {
-                                        throw new BasicException("Syntax error");
-                                    }
-                                    Next();
-                                    break;
-                                }
-                                return Call(current.String, args);
+                                return Call(current.String, Arguments());
                             }
                             if (variable.ContainsKey(current.String))
                                 return variable[current.String];
@@ -564,6 +607,47 @@ namespace BASIC
                             var expr = Term();
                             return new Value(-expr.Number);
                         }
+                    case TokenType.New:
+                        {
+                            if (Current.Type != TokenType.Iden)
+                                throw new BasicException("Syntax error(NEW)");
+                            Class @class;
+                            if (!ClassTable.TryGetValue(Current.String, out @class))
+                                throw new BasicException("Undefined class");
+                            Next();
+                            return new Value(@class.New());
+                        }
+                    case TokenType.LBracket:
+                        {
+                            NumberArray na = null;
+                            StringArray sa = null;
+                            while (Current.Type != TokenType.RBracket)
+                            {
+                                var expr = Expr();
+                                if (na == null && sa == null)
+                                {
+                                    if (expr.Type == ValueType.Number)
+                                        na = new NumberArray();
+                                    if (expr.Type == ValueType.String)
+                                        sa = new StringArray();
+                                }
+                                if (na != null)
+                                    na.Add(expr.Number);
+                                if (sa != null)
+                                    sa.Add(expr.String);
+                                if (Current.Type == TokenType.RBracket)
+                                    break;
+                                if (Current.Type != TokenType.Comma)
+                                    throw new BasicException("Syntax error");
+                                Next();
+                            }
+                            Next();
+                            if (na != null)
+                                return new Value(na);
+                            if (sa != null)
+                                return new Value(sa);
+                            throw new BasicException("Not impl");
+                        }
                     default:
                         throw new BasicException("unexcepp");
                 }
@@ -594,9 +678,36 @@ namespace BASIC
                 return new Value(info.Invoke(bf, args.Select(x => x.Object).ToArray()));
             }
 
-            public Value Expr2()
+            public Value Expr1()
             {
                 var expr = Term();
+                while (true)
+                {
+                    var token = Current;
+                    if (token.Type != TokenType.Dot)
+                    {
+                        return expr;
+                    }
+                    Next();
+                    if (Current.Type != TokenType.Iden)
+                        throw new BasicException("Syntax error(.)");
+                    var expr2 = Current.String;
+                    Next();
+                    if (expr.Type != ValueType.Instance)
+                        throw new BasicException("Type mismatch(.)");
+                    if (Current.Type == TokenType.LParen)
+                    {
+                        var args = Arguments();
+                        var func = expr.Instance.GetFunction(expr2);
+                        expr = Call(new InstanceFunction(func, expr.Instance), args);
+                    }
+                    else
+                        expr = expr.Instance.Variable[expr2];
+                }
+            }
+            public Value Expr2()
+            {
+                var expr = Expr1();
                 while (true)
                 {
                     var token = Current;
@@ -805,6 +916,11 @@ namespace BASIC
                 }
                 int si = i;
                 var oldc = Current;
+                if (variable[varname].Number > end.Number)
+                {
+                    FindForNext();
+                    return;
+                }
                 while (true)
                 {
                     var c = Current;
@@ -827,6 +943,39 @@ namespace BASIC
                         break;
                 }
             }
+
+            private void FindForNext()
+            {
+                int forcount = 0;
+                while (forcount >= 0 && i < Program.Length)
+                {
+                    var c = Current;
+                    switch (c.Type)
+                    {
+                        case TokenType.Next:
+                            forcount--;
+                            break;
+                        case TokenType.For:
+                            forcount++;
+                            break;
+                        case TokenType.If:
+                            i = Program.IndexOf('\n', i);
+                            if (i == -1)
+                                i = Program.Length;
+                            p = false;
+                            break;
+                        case TokenType.Def:
+                            Next();
+                            i = FunctionTable[Current.String].End;
+                            p = false;
+                            break;
+                        default:
+                            break;
+                    }
+                    Next();
+                }
+            }
+
             Stack<int> stack = new Stack<int>();
             void Gosub()
             {
@@ -870,6 +1019,8 @@ namespace BASIC
                     throw new BasicException("Syntax error");
                 Next();
                 var e = Program.IndexOf('\n', i);
+                if (e == -1)
+                    e = Program.Length;
                 if (cond.Number != 0)
                 {
                 }
@@ -922,11 +1073,17 @@ namespace BASIC
                     case TokenType.End:
                         i = Program.Length;
                         break;
+                    case TokenType.Class:
+                        Next();
+                        i = ClassTable[Current.String].End;
+                        p = false;
+                        break;
                     default:
                         throw new BasicException($"unexpected {(c.String != null ? c.String : c.Type.ToString())}");
                 }
             }
-
+            
+            
             private void Let()
             {
                 var v = Current; Next();
@@ -953,6 +1110,44 @@ namespace BASIC
                 }
                 else
                 {
+                    if (eq.Type == TokenType.Dot)
+                    {
+                        var e = variable[v.String];
+                        var idenname = v.String;
+                        while (true)
+                        {
+                            Next();
+                            if (Current.Type != TokenType.Iden)
+                            {
+                                throw new BasicException("Syntax error");
+                            }
+                            idenname = Current.String;
+                            Next();
+                            if (Current.Type == TokenType.Equal)
+                            {
+                                Next();
+                                e.Instance.Variable[idenname] = Expr();
+                                return;
+                            }
+                            if (Current.Type != TokenType.Dot)
+                            {
+                                break;
+                            }
+                            e = e.Instance.Variable[idenname];
+                        }
+                        List<Value> args = new List<Value>();
+                        while (IsExpr(Current.Type))
+                        {
+                            args.Add(Expr());
+                            if (Current.Type != TokenType.Comma)
+                            {
+                                break;
+                            }
+                            Next();
+                        }
+                        Call(new InstanceFunction(e.Instance.GetFunction(idenname), e.Instance), args);
+                        return;
+                    }
                     if (eq.Type != TokenType.Equal)
                     {
                         FuncStatement(v.String);
@@ -991,6 +1186,7 @@ namespace BASIC
                 switch (type)
                 {
                     case TokenType.Iden:
+                    case TokenType.New:
                     case TokenType.Number:
                     case TokenType.Minus:
                     case TokenType.MakeProcInstance:
@@ -1003,12 +1199,17 @@ namespace BASIC
             private bool Assignable(ValueType type, string name)
             {
                 if (variable.ContainsKey(name))
-                    return variable[name].Type == type;
+                {
+                    var v = variable[name];
+                    if (v.Type == ValueType.None)
+                        return true;
+                    return v.Type == type;
+                }
                 else
                 {
                     if (type == ValueType.Number || type == ValueType.String)
                         return GetType(name) == type;
-                    if (type == ValueType.NumberArray)
+                    if (type == ValueType.NumberArray || type == ValueType.Instance)
                         return GetType(name) == ValueType.Number;
                     if (type == ValueType.StringArray)
                         return GetType(name) == ValueType.String;
@@ -1037,6 +1238,7 @@ namespace BASIC
                 variable = interpreter.variable;
                 labelTable = interpreter.labelTable;
                 FunctionTable = interpreter.FunctionTable;
+                ClassTable = interpreter.ClassTable;
             }
 
             public string Run(bool newinstance = true)
@@ -1062,7 +1264,12 @@ namespace BASIC
                             }
                             if (Current.Type == TokenType.Def)
                             {
-                                Defun();
+                                var f = Defun();
+                                FunctionTable.Add(f.Name, f);
+                            }
+                            if (Current.Type == TokenType.Class)
+                            {
+                                DefClass();
                             }
                             isfirst = false;
                             if (i >= Program.Length)
@@ -1081,18 +1288,62 @@ namespace BASIC
                     return result.ToString();
                 }
             }
+
+            private void DefClass()
+            {
+                Next();
+                if (Current.Type != TokenType.Iden)
+                {
+                    throw new BasicException("Syntax error(CLASS)");
+                }
+                var name = Current.String;
+                Next();
+                List<string> field = new List<string>();
+                Dictionary<string, Function> func = new Dictionary<string, Function>();
+                while (i < Program.Length)
+                {
+                    var c = Current;
+                    if (c.Type == TokenType.NewLine || c.Type == TokenType.Colon)
+                    {
+                        Next();
+                        continue;
+                    }
+                    if (c.Type == TokenType.Dim)
+                    {
+                        Next();
+                        if (Current.Type != TokenType.Iden)
+                        {
+                            throw new BasicException("Syntax error(CLASS(DIM))");
+                        }
+                        field.Add(Current.String);
+                        Next();
+                        continue;
+                    }
+                    if (c.Type == TokenType.Def)
+                    {
+                        var f = Defun();
+                        func.Add(f.Name, f);
+                        continue;
+                    }
+                    if (c.Type == TokenType.End)
+                    {
+                        break;
+                    }
+                    throw new BasicException("Syntax error(CLASS)");
+                }
+                Next();
+                var @class = new Class { End = i, FunctionTable = func, Name = name, Parent = null, Variable = field };
+                ClassTable.Add(name, @class);
+            }
+
             bool IsFunction;
             Value ReturnValue;
+
             public Value CallUserFunction(Function func, List<Value> value)
             {
                 if (func.In.Length != value.Count)
                     throw new BasicException("Illegal function call");
-                var local = new Dictionary<string, Value>();
-                int j = 0;
-                foreach (var item in func.In)
-                {
-                    local.Add(item, value[j++]);//TODO:
-                }
+                var local = func.Init(value);
                 labelTable = func.LabelTable;
                 variable = new DoubleDictionary<string, Value>(variable, local);
                 i = func.Start;
@@ -1107,7 +1358,7 @@ namespace BASIC
                 return ReturnValue;
             }
             //DEF IDEN'('(IDEN',')*IDEN?')'
-            private void Defun()
+            private Function Defun()
             {
                 Next();
                 if (Current.Type != TokenType.Iden)
@@ -1158,8 +1409,9 @@ namespace BASIC
                         break;
                     Next();
                 }
-                var func = new Function { End = i, Start = si, HasReturnValue = hasValue, In = inargs.ToArray(), LabelTable = lt };
-                FunctionTable.Add(name, func);
+                Next();
+                var func = new Function { End = i, Start = si, HasReturnValue = hasValue, In = inargs.ToArray(), LabelTable = lt, Name = name };
+                return func;
             }
 
             public string Run(string label)
@@ -1332,6 +1584,64 @@ namespace BASIC
         public bool HasReturnValue;
         public int Start, End;
         public Dictionary<string, int> LabelTable;
+        public string Name;
+
+        internal virtual IDictionary<string, Value> Init(List<Value> args, Interpreter.Interpreter2 inter)
+        {
+            var local = new Dictionary<string, Value>();
+            int j = 0;
+            foreach (var item in In)
+            {
+                local.Add(item, args[j++]);//TODO:
+            }
+            return local;
+        }
+    }
+    class InstanceFunction : Function
+    {
+        public InstanceFunction(Function @base, Instance ins)
+        {
+            Instance = ins;
+            In = @base.In;
+            Name = @base.Name;
+            LabelTable = @base.LabelTable;
+            HasReturnValue = @base.HasReturnValue;
+            Start = @base.Start;
+            End = @base.End;
+        }
+        Instance Instance;
+        internal override IDictionary<string, Value> Init(List<Value> args, Interpreter.Interpreter2 inter)
+        {
+            new Dic
+            return new DoubleDictionary<string, Value>(Instance.Variable, base.Init(args));
+        }
+    }
+    class Class
+    {
+        public string Name;
+        public Class Parent;
+        public IDictionary<string, Function> FunctionTable;
+        public List<string> Variable;
+        public int End;
+        public Instance New()
+        {
+            var inst = new Instance { Class = this, Variable = new Dictionary<string, Value>() };
+            foreach (var item in Variable)
+            {
+                inst.Variable.Add(item, new Value());
+            }
+            return inst;
+        }
+    }
+    class Instance
+    {
+        public Class Class;
+        public IDictionary<string, Value> Variable;
+
+        public Function GetFunction(string expr2)
+        {
+            return Class.FunctionTable[expr2];
+        }
     }
 
     class BuiltinFunction
@@ -1386,6 +1696,10 @@ namespace BASIC
             var p = CommandRegister.CommandList[command];
             return p.Process(message, arg);
         }
+        public void WAIT(double time)
+        {
+            System.Threading.Thread.Sleep((int)time);
+        }
         public StringArray DIMSTR(double dim)
         {
             var a = new StringArray((int)dim);
@@ -1405,6 +1719,18 @@ namespace BASIC
                 a.Add(0);
             }
             return a;
+        }
+        public double LEN(string a)
+        {
+            return a.Length;
+        }
+        public double LEN(NumberArray a)
+        {
+            return a.Count;
+        }
+        public double LEN(StringArray a)
+        {
+            return a.Count;
         }
 
         public string MakeProcInstance(Interpreter interpreter, string label)

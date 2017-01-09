@@ -2488,6 +2488,7 @@ namespace RakudaSlack
         {
             var slack = Slack.Current;
             var cmsg = Slack.CurrentMessage;
+            var cmsgs = Slack.CurrentMessages;
             var command = CommandParser.ParseCommand(msg, true);
 
             slack.OnReaction += (sender, reaction) =>
@@ -2501,6 +2502,9 @@ namespace RakudaSlack
                     JToken ts;
                     if (reaction.item.TryGetValue("ts", out ts) && ts.Type == JTokenType.String && ts.Value<string>() == cmsg.PostedMessage.ts)
                     {
+                        Slack.Current = slack;
+                        Slack.CurrentMessage = cmsg;
+                        Slack.CurrentMessages = cmsgs;
                         cmsg.Text = command.Command.Process(reaction.reaction, slack.GetUserName(reaction.user));
                         cmsg.Post();
                     }
@@ -2523,6 +2527,7 @@ namespace RakudaSlack
         {
             var slack = Slack.Current;
             var cmsg = Slack.CurrentMessage;
+            var cmsgs = Slack.CurrentMessages;
             var command = CommandParser.ParseCommand(msg, true);
 
             slack.OnReaction += (sender, reaction) =>
@@ -2536,6 +2541,9 @@ namespace RakudaSlack
                     JToken ts;
                     if (reaction.item.TryGetValue("ts", out ts) && ts.Type == JTokenType.String && ts.Value<string>() == cmsg.PostedMessage.ts)
                     {
+                        Slack.Current = slack;
+                        Slack.CurrentMessage = cmsg;
+                        Slack.CurrentMessages = cmsgs;
                         cmsg.Text = command.Command.Process(reaction.reaction, slack.GetUserName(reaction.user));
                         cmsg.Post();
                     }
@@ -2558,12 +2566,16 @@ namespace RakudaSlack
         {
             var slack = Slack.Current;
             var cmsg = Slack.CurrentMessage;
+            var cmsgs = Slack.CurrentMessages;
             var command = CommandParser.ParseCommand(msg, true);
 
             cmsg.OnPosted += () =>
             {
                 Task.Run(() =>
                 {
+                    Slack.Current = slack;
+                    Slack.CurrentMessage = cmsg;
+                    Slack.CurrentMessages = cmsgs;
                     command.Command.Process("", command.Argument);
                 });
             };
@@ -2624,11 +2636,17 @@ namespace RakudaSlack
             Slack.CurrentPostCount++;
             var slack = Slack.Current;
             var pmsg = new PostMessage { Slack = Slack.Current, Text = msg, Channel = Slack.CurrentMessage.Channel };
+            Slack.CurrentMessage = pmsg;
+            var cmsgs = Slack.CurrentMessages;
             var command = CommandParser.ParseCommand(arg, true);
             pmsg.OnPosted += () =>
             {
                 Task.Run(() =>
                 {
+                    Slack.Current = slack;
+                    Slack.CurrentMessage = pmsg;
+                    Slack.CurrentMessages = cmsgs;
+                    cmsgs[pc] = pmsg;
                     command.Command.Process("", command.Argument);
                 });
             };
@@ -2706,6 +2724,25 @@ namespace RakudaSlack
         {
             a(msg, arg);
             return "success";
+        }
+    }
+    class GetReactionCount : ICommand
+    {
+        public string Name
+        {
+            get
+            {
+                return "getreactioncount";
+            }
+        }
+
+        public string Process(string msg, string arg)
+        {
+            var cmsg = Slack.CurrentMessage;
+            var a = cmsg.ReactionList(true).message?.reactions?.Where(x => x.name == msg);
+            if (a == null || !a.Any())
+                return "0";
+            return a.First().count.ToString();
         }
     }
 }

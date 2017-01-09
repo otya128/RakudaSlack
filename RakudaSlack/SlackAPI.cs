@@ -31,6 +31,7 @@ namespace RakudaSlack
             public string text { get; set; }
             public string ts { get; set; }
             public string team { get; set; }
+            public string subtype { get; set; }
         }
         class Reaction
         {
@@ -103,8 +104,31 @@ namespace RakudaSlack
             react.Add();
             return react;
         }
+        public ReactionList ReactionList(bool full)
+        {
+            var nvc = new NameValueCollection { { "token", Slack.Token }, { "channel", Channel }, { "timestamp", PostedMessage.ts }, { "full", full ? "true" : "false" } };
+            var wc = new WebClient();
+            wc.QueryString = nvc;
+            return JsonConvert.DeserializeObject<ReactionList>(wc.DownloadString("https://slack.com/api/reactions.get"));
+        }
     }
 
+    class ReactionList
+    {
+        public string type { get; set; }
+        public string channel { get; set; }
+        public ReactionMessage message { get; set; }
+        public class ReactionMessage
+        {
+            public List<ReactionData> reactions { get; set; }
+            public class ReactionData
+            {
+                public string name { get; set; }
+                public int count { get; set; }
+                public List<string> users { get; set; }
+            }
+        }
+    }
     class Reaction
     {
         public Slack Slack;
@@ -171,7 +195,7 @@ namespace RakudaSlack
                     case "message":
                         {
                             var text = JsonConvert.DeserializeObject<RTM.Message>(e.Data);
-                            if (text.user == null || text.user == id)
+                            if (text.user == null || text.user == id || text.subtype == "bot_message")
                                 break;
                             if (text.text.IndexOf(":") != -1)
                             {

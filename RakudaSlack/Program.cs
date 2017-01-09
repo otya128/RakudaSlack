@@ -118,6 +118,7 @@ namespace RakudaSlack
             CommandRegister.Regist(new GetPost());
             CommandRegister.Regist(new Edit());
             CommandRegister.Regist(new SetTimeout());
+            CommandRegister.Regist(new GetReactionCount());
 
             AliasDefine.LoadAlias();
             if (args.Length == 0)
